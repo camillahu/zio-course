@@ -1,4 +1,4 @@
-package com.rockthejvm.playground.part1recap
+package com.rockthejvm.part1recap
 
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, Future}

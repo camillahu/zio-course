@@ -1,4 +1,4 @@
-package com.rockthejvm.playground
+package com.rockthejvm.part1recap
 
 import java.util
 
@@ -102,21 +102,21 @@ object Variance  {
   abstract class MyList2[+A] {
     def add [B >: A](element: B): MyList[B]
   }
-  
+
   // _________________________________________________________________________
 
   //method return types are in COVARIANT position bco production, so this wont compile:
-  
+
   /*
      abstract class Vet2[-A] {
       def rescueAnimal(): A
     }
-  
+
   val vet: Vet2[Animal] = new Vet2[Animal] {
-  def rescueAnimal(): Animal = new Cat 
-  
+  def rescueAnimal(): Animal = new Cat
+
   val lassieVet: Vet2[Dog] = vet
-  val rescureDog: Dog = lassieVet.rescueAnimal() // must return a Dog, but it returns a Cat <-- type conflict! 
+  val rescureDog: Dog = lassieVet.rescueAnimal() // must return a Dog, but it returns a Cat <-- type conflict!
    */
 
   //SOLUTION: NARROW THE RETURN TYPE
@@ -124,7 +124,7 @@ object Variance  {
   abstract class Vet2[-A] {
     def rescueAnimal[B <: A](): B
   }
-  
+
 
   def main(args: Array[String]): Unit = {
 
