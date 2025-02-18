@@ -1,5 +1,6 @@
 package com.rockthejvm.part2effects
 
+import java.time.OffsetDateTime
 import scala.concurrent.Future
 
 object Effects {
@@ -81,7 +82,23 @@ object Effects {
   }) //will not be printed unless called in main, so it's a valid effect
     // the value only describes the effect, it doesn't execute it
 
+  //EXERCISES
+  //1
+  val measureSystemTimeIO: MyIO[Long] = MyIO(() => {
+    System.nanoTime()
+  })
+
+  //2
+  def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = {
+    measureSystemTimeIO.flatMap(startTime =>
+      computation.flatMap(result =>
+        measureSystemTimeIO.map(endTime => (endTime - startTime, result))
+      )
+    )
+  }
+
   def main(args: Array[String]): Unit = {
-    anIOWithSideEffects.unsafeRun()
+    val aComputation = MyIO (() => combine(2, 3))
+    measure(aComputation)
   }
 }
