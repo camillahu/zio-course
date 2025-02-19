@@ -2,6 +2,7 @@ package com.rockthejvm.part2effects
 
 import java.time.OffsetDateTime
 import scala.concurrent.Future
+import scala.io.StdIn
 
 object Effects {
 
@@ -74,6 +75,7 @@ object Effects {
 
     def flatMap[B](f: A => MyIO[B]): MyIO[B] =
       MyIO(() => f(unsafeRun()).unsafeRun())
+
   }
 
   val anIOWithSideEffects: MyIO[Int] = MyIO(() => {
@@ -85,20 +87,58 @@ object Effects {
   //EXERCISES
   //1
   val measureSystemTimeIO: MyIO[Long] = MyIO(() => {
-    System.nanoTime()
+    System.currentTimeMillis()
   })
 
   //2
   def measure[A](computation: MyIO[A]): MyIO[(Long, A)] = {
-    measureSystemTimeIO.flatMap(startTime =>
+   measureSystemTimeIO.flatMap(startTime =>
       computation.flatMap(result =>
         measureSystemTimeIO.map(endTime => (endTime - startTime, result))
       )
     )
   }
 
+  def measure_v2[A](computation: MyIO[A]): MyIO[(Long, A)] = for {
+    startTime <- measureSystemTimeIO
+    result <- computation
+    endTime <- measureSystemTimeIO
+  } yield (endTime - startTime, result)
+
+  def printIO[A](io: MyIO[A]): MyIO[Unit] = {
+    io.flatMap(result => MyIO(() => println(result)))
+  }
+
+  //4
+  val welcomeProgram: MyIO[Unit] = MyIO(() => {
+    println("Whats your name?")
+    val s = readLine.unsafeRun()
+    println(s"welcome $s")
+  })
+
+  //SOLUTIONS
+  //3
+  def readLine: MyIO[String] = MyIO(() => StdIn.readLine())
+
+//    - the
+//  type signature
+//  describes what KIND of computation it will preform (local reasoning)
+//    - the
+//  type signature
+//  describes the
+//  type of
+//  VALUE that it will produce(local reasoning)
+//  -
+//  if side effects are required
+//  , CONSTRUCTION must be separated from the EXECUTION(RT)
+
+
   def main(args: Array[String]): Unit = {
-    val aComputation = MyIO (() => combine(2, 3))
-    measure(aComputation)
+//    val aComputation = MyIO (() => combine(2, 3))
+//    val measuredComputation = measure_v2(aComputation)
+//    val printMC = printIO(measuredComputation)
+//    printMC.unsafeRun()
+
+    welcomeProgram.unsafeRun()
   }
 }
