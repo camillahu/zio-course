@@ -112,25 +112,31 @@ object Effects {
   //4
   val welcomeProgram: MyIO[Unit] = MyIO(() => {
     println("Whats your name?")
-    val s = readLine.unsafeRun()
+    val s = StdIn.readLine()
     println(s"welcome $s")
   })
 
+//  extension (string: String)
+//     def welcomeProgramIO: MyIO[String] = for {
+//       prompt <- putStrLn(string)
+//       input <- readLine
+//     } yield
+
+
+
+  def putStrLn(line:String): MyIO[Unit] = MyIO(() => println(line))
+
+
   //SOLUTIONS
   //3
-  def readLine: MyIO[String] = MyIO(() => StdIn.readLine())
+  val readLine: MyIO[String] = MyIO(() => StdIn.readLine())
 
-//    - the
-//  type signature
-//  describes what KIND of computation it will preform (local reasoning)
-//    - the
-//  type signature
-//  describes the
-//  type of
-//  VALUE that it will produce(local reasoning)
-//  -
-//  if side effects are required
-//  , CONSTRUCTION must be separated from the EXECUTION(RT)
+  //4
+  val program = for {
+    x <- putStrLn("What's your name?")
+    name <- readLine
+    _ <- putStrLn(s"Welcome, $name!")
+  } yield ()
 
 
   def main(args: Array[String]): Unit = {
@@ -139,6 +145,7 @@ object Effects {
 //    val printMC = printIO(measuredComputation)
 //    printMC.unsafeRun()
 
-    welcomeProgram.unsafeRun()
+//    welcomeProgram.unsafeRun()
+    program.unsafeRun()
   }
 }
