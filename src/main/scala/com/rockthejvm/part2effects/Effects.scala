@@ -3,6 +3,7 @@ package com.rockthejvm.part2effects
 import java.time.OffsetDateTime
 import scala.concurrent.Future
 import scala.io.StdIn
+import scala.util.Try
 
 object Effects {
 
@@ -137,6 +138,22 @@ object Effects {
     name <- readLine
     _ <- putStrLn(s"Welcome, $name!")
   } yield ()
+
+
+  //a simplified ZIO
+  case class MyZIO[-R, +E, +A](unsafeRun: R => Either[E, A]) {
+    def map[B](f: A => B): MyZIO[R, E, B] =
+      MyZIO(r => unsafeRun(r) match {
+        case Left(e) => Left(e)
+        case Right(v) => Right(f(v))
+      })
+
+    def flatMap[R1 <: R, E1 >: E, B](f: A => MyZIO[R1, E1, B]): MyZIO[R1, E1, B] =
+      MyZIO(r => unsafeRun(r) match {
+        case Left(e) => Left(e)
+        case Right(v) => f(v).unsafeRun(r)
+      })
+  }
 
 
   def main(args: Array[String]): Unit = {
