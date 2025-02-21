@@ -2,6 +2,7 @@ package com.rockthejvm.part2effects
 
 import zio.*
 
+import scala.annotation.tailrec
 import scala.io.StdIn
 
 object ZIOEffects {
@@ -52,47 +53,131 @@ object ZIOEffects {
   val aFailedIO: IO[String, Int] = ZIO.fail("Something bad happened")
 
 
-  //EXERCISES 
-  //TODO
+  //EXERCISES
 
-  //1
+  //1 (chains)
   def sequenceTakeLast[R, E, A, B](zioa: ZIO[R, E, A], ziob: ZIO[R, E, B]): ZIO[R, E, B] = {
-    zioa.flatMap(_ => ziob)
+    zioa.flatMap(a => ziob.map(b => b))
   }
 
-  //2
+  //(alternative built in method) --sequencing operator
+  def sequenceTakeLast_v2[R, E, A, B](zioa: ZIO[R, E, A], ziob: ZIO[R, E, B]): ZIO[R, E, B] = {
+    zioa *> ziob
+  }
+
+  //2 (for comp)
   def sequenceTakeFirst[R, E, A, B](zioa: ZIO[R, E, A], ziob: ZIO[R, E, B]): ZIO[R, E, A] = for {
     first <- zioa
     _ <- ziob
   } yield first
 
+  //(alternative built in method) --sequencing operator
+  def sequenceTakeFirst_v2[R, E, A, B](zioa: ZIO[R, E, A], ziob: ZIO[R, E, B]): ZIO[R, E, A] = {
+    zioa <* ziob
+  }
+
+  def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Nothing] = {
+    zio *> runForever(zio)
+  }
+
+  //4
+  def convert[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] = {
+    zio.map(a => value)
+  }
+
+  //as method does the exact same calculation as above (map)
+  def convert_v2[R, E, A, B](zio: ZIO[R, E, A], value: B): ZIO[R, E, B] = {
+    zio.as(value)
+  }
+
+  //5
+  def asUnit[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] = {
+    zio.map(a => ())
+  }
+
+  def asUnit_v2[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] = {
+    convert(zio, ())
+  }
+
+  //built in method to make a zio value unit
+  def asUnit_v3[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, Unit] = {
+    zio.unit
+  }
+
+  //6 - recursion
+
+  def sumZIO(n: Int): UIO[Int] = {
+    if (n == 0) ZIO.succeed(0)
+    else for {
+      current <- ZIO.succeed(n)
+      prevSum <- sumZIO(n - 1)
+    } yield current + prevSum
+  }
+
+  //7 - fibonacci
+
+//  def fibZIO(n: Int): UIO[BigInt] = {
+//    def fib(currentFib: BigInt, prevFib: BigInt, acc: Int): UIO[BigInt] = {
+//      if (acc == 0) ZIO.succeed(currentFib)
+//      else ZIO.suspendSucceed {
+//        for {
+//          newFib <- ZIO.succeed(currentFib + prevFib)
+//          prevSum <- fib(newFib, currentFib, acc - 1)
+//        } yield newFib + prevSum
+//      }
+//    }
+//
+//    fib(0, 1, n)
+//  }
+
+
+  //SOLUTIONS
+
   //3
-  def runForever[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = {
-    val endlessLoop = runForever {
-      ZIO.succeed {
-        println("running...")
-        Thread.sleep(1000)
-      }
-    }
-    endlessLoop match {
-      case _ => runForever(zio)
+  def runForever_v2[R, E, A](zio: ZIO[R, E, A]): ZIO[R, E, A] = {
+    zio.flatMap(_ => runForever_v2(zio))
+  }
+
+  val endlessLoop = runForever_v2 {
+    ZIO.succeed {
+      println("running...")
+      Thread.sleep(1000)
     }
   }
 
-
-
+  //7
+  def fiboZIO(n: Int): UIO[BigInt] = {
+    if (n <= 2) ZIO.succeed(1)
+    else for {
+      last <- ZIO.suspendSucceed(fiboZIO(n - 1))
+      prev <- fiboZIO(n - 2)
+    } yield last + prev
+  }
 
   def main(args: Array[String]): Unit = {
 
-    val e1 = sequenceTakeLast(meaningOfLife, improvedMOL)
-    val e2 = sequenceTakeFirst(meaningOfLife, improvedMOL)
-
     //unsafe api to forcefully evaluate ZIO's to test code.
     val runtime = Runtime.default
-    implicit val trace: Trace = Trace.empty
-    Unsafe.unsafe { implicit u: Unsafe =>
-      val mol = runtime.unsafe.run(e2)
-      println(mol)
+
+    given trace: Trace = Trace.empty
+
+    Unsafe.unsafeCompat { (u: Unsafe) =>
+      given uns: Unsafe = u
+
+      val firstEffect = ZIO.succeed {
+        println("computing first effect...")
+        Thread.sleep(1000)
+        1
+      }
+
+      val secondEffect = ZIO.succeed {
+        println("computing second effect...")
+        Thread.sleep(1000)
+        2
+      }
+
+      println(runtime.unsafe.run(fiboZIO(5)))
     }
   }
 }
+
