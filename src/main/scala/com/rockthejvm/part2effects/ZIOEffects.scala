@@ -40,7 +40,7 @@ object ZIOEffects {
   //URIO[R,A] == ZIO[R, Nothing, A] - cannot fail
   val aURIO: URIO[Int, Int] = ZIO.succeed(67)
 
-  //RIO[R,A] = ZIO[Any,E,A] - can fail with a throwable
+  //RIO[R,A] = ZIO[R,E,A] - can fail with a throwable
   val anRIO: RIO[Int, Int] = ZIO.succeed(98)
   val aFailedRIO: RIO[Int, Int] = ZIO.fail(new RuntimeException("RIO failed"))
 
