@@ -1,6 +1,9 @@
 package com.rockthejvm.part2effects
 
-import zio._
+import com.rockthejvm.part2effects.ZIODependenciesServiceLayer.*
+import zio.*
+
+import java.util.concurrent.TimeUnit
 
 object ZIODependencies extends ZIOAppDefault {
 
@@ -8,56 +11,6 @@ object ZIODependencies extends ZIOAppDefault {
 
   case class User(name: String, email: String)
 
-  class UserSubscription(emailService: EmailService, userDatabase: UserDatabase) {
-    def subscribeUser(user: User): Task[Unit] = for {
-      _ <- emailService.email(user)
-      _ <- userDatabase.insert(user)
-    } yield ()
-  }
-
-  object UserSubscription {
-    def create(emailService: EmailService, userDatabase: UserDatabase) =
-      new UserSubscription(emailService, userDatabase)
-  }
-
-  class EmailService {
-    def email(user: User): Task[Unit] = {
-      ZIO.succeed(println(s"you've just been subscribed. Welcome, ${user.name}!"))
-    }
-  }
-
-  object EmailService {
-    def create(): EmailService = new EmailService
-  }
-
-  class UserDatabase(connectionPool: ConnectionPool) {
-    def insert(user: User): Task[Unit] = for {
-      conn <- connectionPool.get
-      _ <- conn.runQuery(s"insert into subscribers(name, email) values (${user.name}, ${user.email}")
-    } yield ()
-  }
-
-  object UserDatabase {
-    def create(connectionPool: ConnectionPool) =
-      new UserDatabase(connectionPool)
-  }
-
-  class ConnectionPool(nConnections: Int) {
-    def get: Task[Connection] = {
-      ZIO.succeed(println("Aquired connection")) *> ZIO.succeed(Connection())
-    }
-  }
-
-  object ConnectionPool {
-    def create(nConnections: Int) =
-      new ConnectionPool(nConnections)
-  }
-
-  case class Connection() {
-    def runQuery(query: String): Task[Unit] = {
-      ZIO.succeed(println(s"Executing query: $query"))
-    }
-  }
 
   val subscriptionService = ZIO.succeed( // Dependency injection
     UserSubscription.create(
@@ -101,16 +54,16 @@ object ZIODependencies extends ZIOAppDefault {
     _ <- subscribe_v2(User("Bon Jovi", "jon@rtjvm.com"))
   } yield ()
 
-//  def run = program_v2.provideLayer { //"provide" for scala 2
-//    ZLayer.succeed(
-//      UserSubscription.create(
-//        EmailService.create(),
-//        UserDatabase.create(
-//          ConnectionPool.create(10)
-//        )
-//      )
-//    )
-//  }
+  //  def run = program_v2.provideLayer { //"provide" for scala 2
+  //    ZLayer.succeed(
+  //      UserSubscription.create(
+  //        EmailService.create(),
+  //        UserDatabase.create(
+  //          ConnectionPool.create(10)
+  //        )
+  //      )
+  //    )
+  //  }
 
   /*
     - we don't need to care about dependencies until the end of the world
@@ -119,9 +72,9 @@ object ZIODependencies extends ZIOAppDefault {
     - layers can be created and composed much like regular ZIOs + rich API
    */
 
-// ------------------------------------------------------
- // ZLayers
-// ------------------------------------------------------
+  // ------------------------------------------------------
+  // ZLayers
+  // ------------------------------------------------------
 
   val connectionPoolLayer: ZLayer[Any, Nothing, ConnectionPool] =
     ZLayer.succeed(ConnectionPool.create(10))
@@ -135,7 +88,7 @@ object ZIODependencies extends ZIOAppDefault {
   val userSubscriptionServiceLayer: ZLayer[EmailService with UserDatabase, Nothing, UserSubscription] =
     ZLayer.fromFunction(UserSubscription.create _)
 
-  //composing layers -- provide a service with all the layers set
+    //composing layers -- provide a service with all the layers set
   val databaseLayerFull: ZLayer[Any, Nothing, UserDatabase] =
     connectionPoolLayer >>> databaseLayer
     //this is called vertical composition
@@ -152,9 +105,55 @@ object ZIODependencies extends ZIOAppDefault {
     subscriptionRequirementsLayer >>> userSubscriptionServiceLayer
     //mix & match
 
+  // best practice: write "factory" methods exposing layers in the companion objects of the services
+  val runnableProgram = program_v2.provideLayer(userSubscriptionLayer)
+
+  // -----------------------------------------------------------------------
+  //TIPS AND TRICKS
+  // -----------------------------------------------------------------------
+
+  // magic -> if you miss a dependency, ZIO will tell you which one(s) with this approach:
+  val runnableProgram_v2 = program_v2.provide(
+    UserSubscription.live,
+    EmailService.live,
+    UserDatabase.live,
+    ConnectionPool.live(10),
+  ) //will also tell you if you've added multiple layers of the same type
+  // ZLayer.Debug.tree can give you insight on the structure of dependencies.
+  // ZLayer.Debug.mermaid can give you insight on the structure of dependencies by giving a link to open in browser.
+
+
+  //magic v2 ->
+  val userSubscriptionLayer_v2:ZLayer[Any, Nothing, UserSubscription] = ZLayer.make[UserSubscription] (
+    UserSubscription.live,
+    EmailService.live,
+    UserDatabase.live,
+    ConnectionPool.live(10),
+  ) // ZIO will figure out which layer fits in where.
+
+  // passthrough -- take a dependency and also expose it in the value channel.
+  val dbWithPoolLayer: ZLayer[ConnectionPool, Nothing, ConnectionPool with UserDatabase] = {
+    UserDatabase.live.passthrough
+  }
+
+  //service -- take a dependency and expose it as a value to further layers
+  val dbService = ZLayer.service[UserDatabase]
+
+  //launch -- "start" a service, creates a ZIO that uses the services and never finishes
+  val subscriptionLaunch: ZIO[EmailService with UserDatabase, Nothing, Nothing] = UserSubscription.live.launch
+
+  //memoization --hidden feature of ZLayers: when an instance is instantiated, the same instance will be used further.
+  //don't need to create a new instance every time it is used. Active by default, unless you use the modifier .fresh
+
+
+  // Already provided services with ZIOAppDefault: Clock, Random, System, Console
+    val getTime = Clock.currentTime(TimeUnit.SECONDS)
+    val randomValue = Random.nextInt
+    val sysVariable = System.env("HADOOP_HOME")
+    val printlnEffect = Console.printLine("This is ZIO print line")
 
 
 
-  def run = program_v2.provideLayer(userSubscriptionLayer)
+  def run = runnableProgram_v2
 
 }

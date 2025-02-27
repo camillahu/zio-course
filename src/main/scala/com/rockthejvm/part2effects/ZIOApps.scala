@@ -1,6 +1,6 @@
 package com.rockthejvm.part2effects
 
-import zio._
+import zio.*
 
 object ZIOApps {
 
