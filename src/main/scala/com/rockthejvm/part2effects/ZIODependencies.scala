@@ -101,7 +101,7 @@ object ZIODependencies extends ZIOAppDefault {
     //combining layers so that return type is both UserDatabase and EmailService.
     //can use "with" keyword in both, or "&" in Scala 3.
 
-  val userSubscriptionLayer: ZLayer[Any, Nothing, UserSubscription] =
+  val userSubscriptionLayer: ZLayer[UserDatabase with EmailService, Nothing, UserSubscription] =
     subscriptionRequirementsLayer >>> userSubscriptionServiceLayer
     //mix & match
 
