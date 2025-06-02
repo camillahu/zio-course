@@ -1,7 +1,9 @@
 package com.rockthejvm.part3concurrency
 
-import zio._
-import com.rockthejvm.utils._
+import zio.*
+import com.rockthejvm.utils.*
+
+import java.io.IOException
 
 object Interruptions extends ZIOAppDefault {
   val zioWithTime =
@@ -52,29 +54,43 @@ object Interruptions extends ZIOAppDefault {
 
   //exercises
 
-  val interruption = for {
-    fib <- zioWithTime.fork
-    _ <- ZIO.sleep(1.second) *> ZIO.succeed("Interrupting!").debugThread *> fib.interrupt //can also use interruptFork effect
-    //above is an effect, blocks the calling fiber until the interrupted fiber is done/interrupted
-    _ <- ZIO.succeed("Interruption successful").debugThread
-    result <- fib.join
-  } yield result
+//  val interruption = for {
+//    fib <- zioWithTime.fork
+//    _ <- ZIO.sleep(1.second) *> ZIO.succeed("Interrupting!").debugThread *> fib.interrupt //can also use interruptFork effect
+//    //above is an effect, blocks the calling fiber until the interrupted fiber is done/interrupted
+//    _ <- ZIO.succeed("Interruption successful").debugThread
+//    result <- fib.join
+//  } yield result
 
   //1
   def timeout[R,E,A](zio: ZIO[R,E,A], time: Duration): ZIO[R,E,A] = {
-    val fib = zio.fork
-
-    ZIO.sleep(time) *> fib.interrupt
-    zio.foldZIO(
-      ex => ZIO.fail(ex),
-      value => ZIO.succeed(value)
-    )
+    for {
+      fib <- zio.fork
+      fork <- fib.interrupt.delay(time).fork
+      result <- fib.join
+    } yield result
   }
+
+  val testTimeout = timeout(
+    ZIO.succeed("Starting...").debugThread *>
+    ZIO.sleep(2.seconds) *> ZIO.succeed("I made it").debugThread,
+    1.second
+  ).debugThread
 
 
   //2
-  def timeout_v2[R,E,A](zio: ZIO[R,E,A], time: Duration): ZIO[R,E,Option[A]] = ???
+  def timeout_v2[R,E,A](zio: ZIO[R,E,A], time: Duration): ZIO[R,E,Option[A]] = {
+    timeout(zio, time).foldCauseZIO(
+      cause => if (cause.isInterrupted) ZIO.none else ZIO.failCause(cause),
+      value => ZIO.some(value)
+    )
+  }
 
+  val testTimeout_v2 = timeout_v2(
+    ZIO.succeed("Starting...").debugThread *>
+      ZIO.sleep(2.seconds) *> ZIO.succeed("I made it").debugThread,
+    1.second
+  ).debugThread
 
-  def run = testRace
+  def run = testTimeout_v2
 }
