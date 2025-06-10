@@ -58,8 +58,13 @@ object BlockingEffects extends ZIOAppDefault{
     _ <- fib.join
   } yield ()
 
-  //Semantic blocking
+  //Semantic blocking - no blocking threads, descheduling the effect/fiber
+  val sleepingThread = ZIO.succeed(Thread.sleep(1000)) //blocking, uninterruptible
+  val sleeping = ZIO.sleep(1.second) //semantically blocking, interruptible
 
+  //yield
+  val chainedZIO = (1 to 1000).map(i => ZIO.succeed(i)).reduce(_.debugThread *> _.debugThread)
+  val yieldingDemo = (1 to 1000).map(i => ZIO.succeed(i)).reduce(_.debugThread *> ZIO.yieldNow *> _.debugThread)
 
-  def run = interruptableBlockingDemo
+  def run = yieldingDemo
 }
