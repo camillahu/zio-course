@@ -13,7 +13,6 @@
         </option>
         <option name="resolveClassifiers" value="false" />
         <option name="sbtVersion" value="1.6.2" />
-        <option name="separateProdAndTestSources" value="false" />
       </SbtProjectSettings>
     </option>
   </component>
